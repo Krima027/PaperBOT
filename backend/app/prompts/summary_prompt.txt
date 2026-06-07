@@ -1,0 +1,12 @@
+Summarize the following research paper.
+
+Requirements:
+- Maximum 150 words
+- Academic language
+- Include main objective
+- Include methodology
+- Include findings
+
+Paper:
+
+{text}

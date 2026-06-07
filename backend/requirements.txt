@@ -1,0 +1,15 @@
+annotated-types==0.7.0
+anyio==4.13.0
+fastapi==0.115.5
+groq==0.13.0
+h11==0.16.0
+httpx==0.28.1
+idna==3.16
+pydantic==2.10.6
+pydantic_core==2.27.2
+PyMuPDF==1.25.5
+python-dotenv==1.0.1
+python-multipart==0.0.20
+starlette==0.41.3
+typing_extensions==4.12.2
+uvicorn==0.34.0
