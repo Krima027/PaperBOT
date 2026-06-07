@@ -34,7 +34,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-display font-bold text-white mb-1">Welcome back, Alex 👋</h1>
+          <h1 className="text-2xl font-display font-bold text-white mb-1">Welcome👋</h1>
           <p className="text-slate-400 text-sm">Here's what's happening with your research today.</p>
         </div>
         <Link to="/upload">
