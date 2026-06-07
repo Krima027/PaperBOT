@@ -27,8 +27,11 @@ app = FastAPI(title="PaperBOT API", version="1.0.0")
 # CORS only needed for local dev now (same origin in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=[
+        "http://localhost:5173",
+        "https://paperbot-1-54ll.onrender.com"
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
