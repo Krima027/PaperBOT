@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
 
-# FIX P1+P2: Register the correct (upload) router, not the dead extract router
 from app.routes.upload import router as upload_router
 from app.routes.summary import router as summary_router
 from app.routes.tldr import router as tldr_router
@@ -20,17 +22,18 @@ from app.routes.abstract_generator import router as abstract_generator_router
 from app.routes.research_gap import router as research_gap_router
 from app.routes.grammar import router as grammar_router
 
-
 app = FastAPI(title="PaperBOT API", version="1.0.0")
 
+# CORS only needed for local dev now (same origin in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ── API routes ──────────────────────────────────────────────
 app.include_router(upload_router)
 app.include_router(summary_router)
 app.include_router(tldr_router)
@@ -49,7 +52,19 @@ app.include_router(abstract_generator_router)
 app.include_router(research_gap_router)
 app.include_router(grammar_router)
 
+# ── Serve React frontend build ───────────────────────────────
+FRONTEND_BUILD = Path(__file__).resolve().parent.parent.parent / "frontend" / "body" / "dist"
 
-@app.get("/")
-def home():
-    return {"message": "PaperBOT API Running Successfully"}
+if FRONTEND_BUILD.exists():
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_BUILD / "assets")), name="assets")
+
+    # Catch-all: serve index.html for any non-API route (React Router support)
+    @app.get("/{full_path:path}")
+    async def serve_react(full_path: str):
+        index = FRONTEND_BUILD / "index.html"
+        return FileResponse(str(index))
+else:
+    @app.get("/")
+    def home():
+        return {"message": "PaperBOT API Running. Frontend not built yet."}

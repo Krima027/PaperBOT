@@ -1,35 +1,26 @@
-const BASE_URL = import.meta.env.VITE_API_URL;
+// In production: same origin, so BASE_URL = ""
+// In local dev: reads VITE_API_URL from .env (e.g. http://localhost:8000)
+const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 // ====================
 // Upload PDF
 // ====================
 export const uploadPaper = async (file) => {
-
   console.log("Uploading file:", file);
-
   const formData = new FormData();
   formData.append("file", file);
-
   const response = await fetch(`${BASE_URL}/upload`, {
     method: "POST",
     body: formData,
   });
-
   console.log("Status:", response.status);
-
   if (!response.ok) {
-
     const text = await response.text();
-
     console.log("Backend error:", text);
-
     throw new Error(text);
   }
-
   const data = await response.json();
-
   console.log("Success:", data);
-
   return data;
 };
 
