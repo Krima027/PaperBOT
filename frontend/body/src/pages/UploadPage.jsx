@@ -18,6 +18,23 @@ const TIPS = [
   'Analysis begins automatically after upload',
 ];
 
+function getUser() {
+  try {
+    const stored = localStorage.getItem('user');
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return null;
+}
+
+function saveToHistory(email, entries) {
+  if (!email) return;
+  try {
+    const existing = JSON.parse(localStorage.getItem(`history_${email}`) || '[]');
+    const updated = [...entries, ...existing];
+    localStorage.setItem(`history_${email}`, JSON.stringify(updated));
+  } catch {}
+}
+
 export default function UploadPage() {
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState([]);
@@ -53,7 +70,6 @@ export default function UploadPage() {
       for (const fileObj of files) {
         const { file, id } = fileObj;
 
-        // Visual simulation of progress
         const interval = setInterval(() => {
           setProgress(prev => ({
             ...prev,
@@ -63,20 +79,48 @@ export default function UploadPage() {
 
         try {
           const result = await uploadPaper(file);
-          results.push(result);
+          results.push({ result, file });
           setProgress(prev => ({ ...prev, [id]: 100 }));
         } catch (err) {
           console.error(`Failed to upload: ${file.name}`, err);
-          throw err; // Stop sequence on error
+          throw err;
         } finally {
           clearInterval(interval);
         }
       }
 
-      // Store results - if multiple, we store as an array
-      localStorage.setItem("paperAnalysis", JSON.stringify(results.length > 1 ? results : results[0]));
-      // Store full text of the first/primary paper for immediate view
-      localStorage.setItem("paperText", results[0].full_text);
+      // Save analysis data as before
+      const analysisData = results.map(r => r.result);
+      localStorage.setItem("paperAnalysis", JSON.stringify(analysisData.length > 1 ? analysisData : analysisData[0]));
+      localStorage.setItem("paperText", results[0].result.full_text);
+
+      // Save to per-user history so HistoryPage & ProfilePage pick it up
+      const user = getUser();
+      const email = user?.email || '';
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10);
+
+      const historyEntries = results.map(({ result, file }, idx) => {
+        // Count how many papers this user already has to generate "Paper Upload N"
+        let existingCount = 0;
+        try {
+          const existing = JSON.parse(localStorage.getItem(`history_${email}`) || '[]');
+          existingCount = existing.length;
+        } catch {}
+
+        return {
+          id: `${Date.now()}_${idx}`,
+          title: result.title || `Paper Upload ${existingCount + idx + 1}`,
+          authors: Array.isArray(result.authors) ? result.authors.join(', ') : (result.authors || ''),
+          year: result.year || null,
+          date: dateStr,
+          status: 'Analyzed',
+          size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+          pages: result.pages || null,
+        };
+      });
+
+      saveToHistory(email, historyEntries);
 
       setDone(true);
     } catch (error) {
