@@ -1,9 +1,9 @@
 // src/pages/ProfilePage.jsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
-  User, Mail, Bell, Shield, CreditCard, Moon, Sun, Globe,
-  Edit3, Check, Camera, Zap, Crown, Download,
+  User, Mail, Bell, Shield, Moon, Sun,
+  Edit3, Check, Camera, Download,
 } from 'lucide-react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import Card, { CardHeader } from '../components/Card';
@@ -16,6 +16,14 @@ function getUser() {
     if (stored) return JSON.parse(stored);
   } catch {}
   return null;
+}
+
+function getUserHistory(email) {
+  try {
+    const stored = localStorage.getItem(`history_${email}`);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return [];
 }
 
 function getInitials(name) {
@@ -42,40 +50,54 @@ export default function ProfilePage() {
   const storedUser = getUser();
 
   const [editName,  setEditName]  = useState(false);
-  const [name,      setName]      = useState(storedUser?.name || 'User');
-  const [tempName,  setTempName]  = useState(storedUser?.name || 'User');
+  const [name,      setName]      = useState(storedUser?.name  || 'User');
+  const [tempName,  setTempName]  = useState(storedUser?.name  || 'User');
   const [darkMode,  setDarkMode]  = useState(true);
   const [notifs,    setNotifs]    = useState({ email: true, weekly: true, tips: false, updates: true });
   const [saved,     setSaved]     = useState(false);
 
-  const email = storedUser?.email || '';
-  const avatar = storedUser?.avatar || null;
+  const email   = storedUser?.email  || '';
+  const avatar  = storedUser?.avatar || null;
   const initials = getInitials(name);
+
+  // Real stats derived from the user's actual upload history
+  const history = useMemo(() => getUserHistory(email), [email]);
+  const analyzed   = history.filter(p => p.status === 'Analyzed').length;
+  const summarized = history.filter(p => p.status === 'Summarized').length;
+  const totalPages = history.reduce((acc, p) => acc + (p.pages || 0), 0);
+
+  // Rough "days active" = distinct calendar days in history
+  const daysActive = useMemo(() => {
+    const days = new Set(history.map(p => p.date?.slice(0, 10)).filter(Boolean));
+    return days.size;
+  }, [history]);
+
+  const stats = [
+    { label: 'Papers',      value: history.length },
+    { label: 'Analyzed',    value: analyzed        },
+    { label: 'Summarized',  value: summarized      },
+    { label: 'Days Active', value: daysActive      },
+  ];
 
   const saveName = () => {
     setName(tempName);
     setEditName(false);
     setSaved(true);
-    // also update localStorage
     if (storedUser) {
       localStorage.setItem('user', JSON.stringify({ ...storedUser, name: tempName }));
     }
     setTimeout(() => setSaved(false), 2500);
   };
 
-  const stats = [
-    { label: 'Papers',      value: 47  },
-    { label: 'Summaries',   value: 128 },
-    { label: 'Citations',   value: 312 },
-    { label: 'Days Active', value: 84  },
-  ];
+  // Derive a simple "plan" label — no fake "Pro Plan" hardcoded
+  const planLabel = storedUser?.plan || 'Free Plan';
 
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-display font-bold text-white mb-1">Profile & Settings</h1>
-          <p className="text-slate-400 text-sm">Manage your account, preferences, and subscription.</p>
+          <p className="text-slate-400 text-sm">Manage your account and preferences.</p>
         </div>
 
         {/* Profile card */}
@@ -116,9 +138,8 @@ export default function ProfilePage() {
                 </p>
               )}
               <div className="flex flex-wrap gap-2">
-                <Badge variant="primary"><Crown className="w-3 h-3" /> Pro Plan</Badge>
-                <Badge variant="success">Verified</Badge>
-                <Badge variant="default"><Globe className="w-3 h-3" /> MIT, Cambridge</Badge>
+                <Badge variant="primary">{planLabel}</Badge>
+                {avatar && <Badge variant="success">Google Account</Badge>}
               </div>
             </div>
             {saved && (
@@ -129,7 +150,7 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Stats row */}
+          {/* Stats row — real data */}
           <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10">
             {stats.map(({ label, value }) => (
               <div key={label} className="text-center">
@@ -138,6 +159,9 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
+          {history.length === 0 && (
+            <p className="text-xs text-slate-500 text-center mt-3">Upload papers to see your stats here.</p>
+          )}
         </Card>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -196,9 +220,9 @@ export default function ProfilePage() {
             <CardHeader title="Security" icon={Shield} />
             <div className="space-y-3">
               {[
-                { label: 'Change Password',  desc: 'Last changed 30 days ago'   },
-                { label: 'Two-Factor Auth',  desc: 'Not enabled — recommended'  },
-                { label: 'Active Sessions',  desc: '2 devices logged in'        },
+                { label: 'Change Password',  desc: 'Update your login password'  },
+                { label: 'Two-Factor Auth',  desc: 'Not enabled — recommended'   },
+                { label: 'Active Sessions',  desc: 'Manage logged-in devices'    },
               ].map(({ label, desc }) => (
                 <div key={label} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-all cursor-pointer group">
                   <div>
@@ -211,27 +235,22 @@ export default function ProfilePage() {
             </div>
           </Card>
 
-          {/* Subscription */}
-          <Card hover={false} glow>
-            <CardHeader title="Subscription" icon={CreditCard} />
-            <div className="p-4 bg-gradient-to-br from-primary-900/40 to-accent-900/30 border border-primary-500/25 rounded-xl mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-white flex items-center gap-2"><Crown className="w-4 h-4 text-amber-400" /> Pro Plan</span>
-                <Badge variant="success">Active</Badge>
+          {/* Account info */}
+          <Card hover={false}>
+            <CardHeader title="Account" icon={User} />
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-white/5">
+                <p className="text-xs text-slate-500 mb-0.5">Display name</p>
+                <p className="text-sm font-medium text-white">{name}</p>
               </div>
-              <p className="text-slate-400 text-sm mb-3">$19/month · Renews June 24, 2025</p>
-              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full w-3/4 bg-gradient-to-r from-primary-600 to-accent-500 rounded-full" />
+              <div className="p-3 rounded-xl bg-white/5">
+                <p className="text-xs text-slate-500 mb-0.5">Email</p>
+                <p className="text-sm font-medium text-white">{email || '—'}</p>
               </div>
-              <p className="text-xs text-slate-500 mt-1">75% of billing period used</p>
-            </div>
-            <div className="space-y-2">
-              <Button variant="secondary" className="w-full justify-center" size="sm" icon={<Download className="w-3.5 h-3.5" />}>
-                Download Invoices
-              </Button>
-              <Button variant="danger" className="w-full justify-center" size="sm">
-                Cancel Subscription
-              </Button>
+              <div className="p-3 rounded-xl bg-white/5">
+                <p className="text-xs text-slate-500 mb-0.5">Plan</p>
+                <p className="text-sm font-medium text-white">{planLabel}</p>
+              </div>
             </div>
           </Card>
         </div>
@@ -242,7 +261,19 @@ export default function ProfilePage() {
           <p className="text-slate-400 text-sm mb-4">These actions are permanent and cannot be undone.</p>
           <div className="flex flex-wrap gap-3">
             <Button variant="danger" size="sm" icon={<Download className="w-3.5 h-3.5" />}>Export All Data</Button>
-            <Button variant="danger" size="sm">Delete Account</Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => {
+                if (window.confirm('Delete your account? This cannot be undone.')) {
+                  localStorage.removeItem('user');
+                  if (email) localStorage.removeItem(`history_${email}`);
+                  window.location.href = '/';
+                }
+              }}
+            >
+              Delete Account
+            </Button>
           </div>
         </Card>
       </div>

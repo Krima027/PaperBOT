@@ -3,42 +3,65 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   History, Search, Filter, Download, Eye, Trash2,
-  FileText, Calendar, ChevronDown, X,
+  FileText, Calendar, ChevronDown, X, Upload,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import DashboardLayout from '../layouts/DashboardLayout';
 import Card, { CardHeader } from '../components/Card';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
-import { historyPapers } from '../data/mockData';
 
 const statusVariant = { Analyzed: 'success', Summarized: 'primary', Pending: 'warning' };
 const STATUSES = ['All', 'Analyzed', 'Summarized', 'Pending'];
 
+function getUser() {
+  try {
+    const stored = localStorage.getItem('user');
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return null;
+}
+
+function getUserHistory(email) {
+  try {
+    const stored = localStorage.getItem(`history_${email}`);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return [];
+}
+
 export default function HistoryPage() {
-  const [query,     setQuery]     = useState('');
-  const [status,    setStatus]    = useState('All');
-  const [sortBy,    setSortBy]    = useState('date');
-  const [papers,    setPapers]    = useState(historyPapers);
+  const user = getUser();
+  const email = user?.email || '';
+
+  const [query,      setQuery]      = useState('');
+  const [status,     setStatus]     = useState('All');
+  const [sortBy,     setSortBy]     = useState('date');
+  const [papers,     setPapers]     = useState(() => getUserHistory(email));
   const [filterOpen, setFilterOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return papers
       .filter(p => {
         const matchQ = p.title.toLowerCase().includes(query.toLowerCase()) ||
-                       p.authors.toLowerCase().includes(query.toLowerCase());
+                       (p.authors || '').toLowerCase().includes(query.toLowerCase());
         const matchS = status === 'All' || p.status === status;
         return matchQ && matchS;
       })
       .sort((a, b) => {
         if (sortBy === 'date')  return new Date(b.date) - new Date(a.date);
-        if (sortBy === 'year')  return b.year - a.year;
+        if (sortBy === 'year')  return (b.year || 0) - (a.year || 0);
         if (sortBy === 'title') return a.title.localeCompare(b.title);
         return 0;
       });
   }, [papers, query, status, sortBy]);
 
-  const remove = (id) => setPapers(p => p.filter(x => x.id !== id));
+  const remove = (id) => {
+    const updated = papers.filter(x => x.id !== id);
+    setPapers(updated);
+    if (email) localStorage.setItem(`history_${email}`, JSON.stringify(updated));
+  };
 
   return (
     <DashboardLayout>
@@ -110,9 +133,19 @@ export default function HistoryPage() {
       {filtered.length === 0 ? (
         <EmptyState
           icon={History}
-          title="No papers found"
-          description={query ? `No papers match "${query}". Try different search terms.` : 'Upload your first paper to get started with AI analysis.'}
-          action={<Button onClick={() => { setQuery(''); setStatus('All'); }}>Clear Filters</Button>}
+          title={papers.length === 0 ? 'No papers yet' : 'No papers found'}
+          description={
+            papers.length === 0
+              ? 'Upload your first paper to get started with AI analysis.'
+              : query
+                ? `No papers match "${query}". Try different search terms.`
+                : 'No papers match the selected filter.'
+          }
+          action={
+            papers.length === 0
+              ? <Link to="/upload"><Button icon={<Upload className="w-4 h-4" />}>Upload Paper</Button></Link>
+              : <Button onClick={() => { setQuery(''); setStatus('All'); }}>Clear Filters</Button>
+          }
         />
       ) : (
         <div className="space-y-3">
@@ -130,13 +163,13 @@ export default function HistoryPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-3 mb-1">
                       <h3 className="font-semibold text-white text-sm leading-tight group-hover:text-primary-300 transition-colors">{title}</h3>
-                      <Badge variant={statusVariant[s]}>{s}</Badge>
+                      <Badge variant={statusVariant[s] || 'default'}>{s}</Badge>
                     </div>
-                    <p className="text-slate-400 text-xs mb-2">{authors} · {year}</p>
+                    {authors && <p className="text-slate-400 text-xs mb-2">{authors}{year ? ` · ${year}` : ''}</p>}
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {date}</span>
-                      <span>{pages} pages</span>
-                      <span>{size}</span>
+                      {date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {date}</span>}
+                      {pages  && <span>{pages} pages</span>}
+                      {size   && <span>{size}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">

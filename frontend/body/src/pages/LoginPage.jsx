@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [password,  setPassword]  = useState('');
   const [showPass,  setShowPass]  = useState(false);
   const [loading,   setLoading]   = useState(false);
+  const [remember,  setRemember]  = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -20,6 +21,20 @@ export default function LoginPage() {
     setLoading(true);
     await new Promise(r => setTimeout(r, 1500));
     setLoading(false);
+
+    // Derive a display name from the email (e.g. "krima@gmail.com" → "Krima")
+    const namePart = email.split('@')[0];
+    const displayName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+
+    const userData = { name: displayName, email, avatar: null };
+    localStorage.setItem('user', JSON.stringify(userData));
+
+    // Initialise empty history for this user if not already present
+    const historyKey = `history_${email}`;
+    if (!localStorage.getItem(historyKey)) {
+      localStorage.setItem(historyKey, JSON.stringify([]));
+    }
+
     navigate('/dashboard');
   };
 
@@ -89,11 +104,17 @@ export default function LoginPage() {
           <GoogleLogin
             onSuccess={(credentialResponse) => {
               const decoded = jwtDecode(credentialResponse.credential);
-              localStorage.setItem('user', JSON.stringify({
+              const userData = {
                 name: decoded.name,
                 email: decoded.email,
                 avatar: decoded.picture,
-              }));
+              };
+              localStorage.setItem('user', JSON.stringify(userData));
+              // Initialise empty history for this Google user if not already present
+              const historyKey = `history_${decoded.email}`;
+              if (!localStorage.getItem(historyKey)) {
+                localStorage.setItem(historyKey, JSON.stringify([]));
+              }
               navigate('/dashboard');
             }}
             onError={() => alert('Google login failed. Please try again.')}
@@ -116,7 +137,7 @@ export default function LoginPage() {
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                placeholder="alex@university.edu"
+                placeholder="you@university.edu"
                 className="input-field pl-10"
               />
             </div>
@@ -141,7 +162,13 @@ export default function LoginPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="remember" className="rounded border-white/20 bg-white/5 text-primary-600 focus:ring-primary-500" />
+            <input
+              type="checkbox"
+              id="remember"
+              checked={remember}
+              onChange={e => setRemember(e.target.checked)}
+              className="rounded border-white/20 bg-white/5 text-primary-600 focus:ring-primary-500"
+            />
             <label htmlFor="remember" className="text-sm text-slate-400">Remember me for 30 days</label>
           </div>
 
